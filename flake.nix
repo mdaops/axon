@@ -22,6 +22,7 @@
 
             just
             jq
+            uv
           ];
 
           shellHook = ''
