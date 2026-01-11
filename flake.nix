@@ -16,7 +16,6 @@
           buildInputs = with pkgs; [
             bun
             turbo
-            nodejs_22
 
             kubectl
             kustomize
