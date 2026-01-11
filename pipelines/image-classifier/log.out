@@ -1,0 +1,12 @@
+dataset size: 60000 images
+image shape: (28, 28)
+labels: ['T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat', 'Sandal', 'Shirt', 'Sneaker', 'Bag', 'Ankle boot']
+Ankle boot
+T-shirt/top
+Traceback (most recent call last):
+  File "/home/dev/gh/mdaops/synapse/axon/pipelines/image-classifier/explore.py", line 18, in <module>
+    image.save(samples_dir / f"{i:02d}_{label_name}.png")
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/dev/gh/mdaops/synapse/axon/pipelines/image-classifier/.venv/lib/python3.13/site-packages/PIL/Image.py", line 2585, in save
+    fp = builtins.open(filename, "w+b")
+FileNotFoundError: [Errno 2] No such file or directory: 'data/samples/01_T-shirt/top.png'

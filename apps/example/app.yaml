@@ -1,4 +1,2 @@
 name: example
 team: platform
-namespace: example
-path: apps/example/deploy/overlays/dev
