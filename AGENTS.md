@@ -3,12 +3,44 @@
 Product monorepo for Synapse MLOps platform. Contains ML services, production services, and UI.
 Deployed to fleet clusters via Argo CD (infrastructure managed by Cortex).
 
+## Local Development
+
+Local cluster: `kind-axon`
+
+```bash
+kubectl config use-context kind-axon
+```
+
+### Cluster Services
+
+| Service | Namespace | Endpoint (in-cluster) | Purpose |
+|---------|-----------|----------------------|---------|
+| SeaweedFS S3 | seaweedfs-system | `seaweedfs-s3.seaweedfs-system.svc:8333` | Object storage for images, artifacts |
+| SeaweedFS Filer | seaweedfs-system | `seaweedfs-filer.seaweedfs-system.svc:8888` | File API for SeaweedFS |
+| Argo Workflows | argo-workflows | `argo-workflows-argo-workflows-server.argo-workflows.svc:2746` | Pipeline orchestration |
+| Feast | feast-system | `feast-system-feast-feature-server.feast-system.svc:6566` | Feature store |
+| KServe | kserve | - | Model serving |
+| Valkey | valkey-system | `valkey-master.valkey-system.svc:6379` | Redis-compatible cache |
+| PostgreSQL | postgres-system | - | Database |
+
+### Port Forwarding (for local access)
+
+```bash
+kubectl port-forward -n argo-workflows svc/argo-workflows-argo-workflows-server 2746:2746
+kubectl port-forward -n seaweedfs-system svc/seaweedfs-s3 8333:8333
+kubectl port-forward -n feast-system svc/feast-system-feast-feature-server 6566:6566
+```
+
 ## Stack
 
 - **Runtime**: Bun
 - **Language**: TypeScript with Effect-TS
 - **UI**: Svelte 5
 - **ML Pipelines**: Python with uv
+- **Orchestration**: Argo Workflows
+- **Feature Store**: Feast
+- **Object Storage**: SeaweedFS (S3-compatible)
+- **Model Serving**: KServe
 - **Build**: Turborepo
 
 ## Structure
@@ -146,12 +178,115 @@ uv run ruff format .        # Format
 
 pyproject.toml:
 ```toml
+[project]
+name = "pipeline-name"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = []
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
+```
+
+## ML Pipelines
+
+Pipelines live in `pipelines/<name>/` with structure:
+
+```
+pipelines/<name>/
+├── pyproject.toml          # uv project config
+├── uv.lock                  # Locked dependencies
+├── feature_store.yaml      # Feast configuration (if using features)
+├── workflow.yaml           # Argo Workflow definition
+├── features/               # Feast feature definitions
+│   ├── __init__.py
+│   ├── entities.py
+│   └── views.py
+├── src/
+│   └── <name>/
+│       ├── __init__.py
+│       └── steps/          # Individual workflow steps
+│           ├── __init__.py
+│           ├── prepare.py
+│           ├── train.py
+│           └── evaluate.py
+└── tests/
+```
+
+### Argo Workflows
+
+Workflows are defined as Kubernetes manifests:
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: pipeline-name-
+  namespace: dev
+spec:
+  entrypoint: main
+  serviceAccountName: argo-workflow
+  artifactRepositoryRef:
+    configMap: artifact-repositories
+    key: default-v1
+  templates:
+    - name: main
+      steps:
+        - - name: step-one
+            template: step-one-template
+        - - name: step-two
+            template: step-two-template
+```
+
+### Feast Integration
+
+Connect to cluster Feast from pipelines:
+
+```python
+from feast import FeatureStore
+
+store = FeatureStore(repo_path=".")
+```
+
+feature_store.yaml for local development:
+```yaml
+project: my_pipeline
+registry: data/registry.db
+provider: local
+online_store:
+  type: sqlite
+  path: data/online_store.db
+```
+
+feature_store.yaml for cluster:
+```yaml
+project: my_pipeline
+registry:
+  registry_type: sql
+  path: postgresql://user:pass@postgres.postgres-system.svc:5432/feast
+provider: local
+online_store:
+  type: redis
+  connection_string: valkey-master.valkey-system.svc:6379
+```
+
+### SeaweedFS Access
+
+From Python (using boto3 with S3 API):
+```python
+import boto3
+
+s3 = boto3.client(
+    "s3",
+    endpoint_url="http://seaweedfs-s3.seaweedfs-system.svc:8333",
+    aws_access_key_id="any",
+    aws_secret_access_key="any",
+)
+s3.upload_file("local.parquet", "bucket-name", "path/to/file.parquet")
 ```
 
 ## Kubernetes Manifests
