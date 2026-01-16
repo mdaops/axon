@@ -19,6 +19,7 @@
 
             kubectl
             kustomize
+            awscli2
 
             just
             jq

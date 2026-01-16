@@ -1,0 +1,66 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: discount-training-
+  namespace: dev
+spec:
+  entrypoint: training-pipeline
+  templates:
+    - name: training-pipeline
+      steps:
+        - - name: generate-data
+            template: generate-data
+        - - name: train-model
+            template: train-model
+            arguments:
+              artifacts:
+                - name: data
+                  from: "{{steps.generate-data.outputs.artifacts.data}}"
+        - - name: upload-model
+            template: upload-model
+            arguments:
+              artifacts:
+                - name: model
+                  from: "{{steps.train-model.outputs.artifacts.model}}"
+
+    - name: generate-data
+      container:
+        image: discount-decisioning:v1
+        command: [python, -m, discount_decisioning.data.generator]
+        args: ["--output", "/tmp/outputs/sessions.parquet"]
+      outputs:
+        artifacts:
+          - name: data
+            path: /tmp/outputs/sessions.parquet
+
+    - name: train-model
+      inputs:
+        artifacts:
+          - name: data
+            path: /tmp/inputs/sessions.parquet
+      container:
+        image: discount-decisioning:v1
+        command: [python, -m, discount_decisioning.training.train]
+        args: ["--input", "/tmp/inputs/sessions.parquet", "--output", "/tmp/outputs/model.joblib"]
+      outputs:
+        artifacts:
+          - name: model
+            path: /tmp/outputs/model.joblib
+
+    - name: upload-model
+      inputs:
+        artifacts:
+          - name: model
+            path: /tmp/inputs/model.joblib
+      container:
+        image: amazon/aws-cli:latest
+        command: [sh, -c]
+        args:
+          - |
+            aws s3 cp /tmp/inputs/model.joblib s3://models/discount-decisioning/v2/model.joblib \
+              --endpoint-url http://seaweedfs-s3.seaweedfs-system.svc:8333
+        env:
+          - name: AWS_ACCESS_KEY_ID
+            value: "any"
+          - name: AWS_SECRET_ACCESS_KEY
+            value: "any"
