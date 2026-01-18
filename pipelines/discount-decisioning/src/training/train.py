@@ -1,3 +1,5 @@
+import argparse
+
 import joblib
 import pandas as pd
 from pathlib import Path
@@ -29,11 +31,14 @@ def evaluate_model(model: LogisticRegression, X: pd.DataFrame, y: pd.Series) -> 
 
 
 def main() -> None:
-    data_path = Path("data/sessions.parquet")
-    model_dir = Path("model")
-    model_dir.mkdir(exist_ok=True)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--input", type=Path, default=Path("data/sessions.parquet"))
+    parser.add_argument("--output", type=Path, default=Path("model/model.joblib"))
+    args = parser.parse_args()
 
-    X, y = load_data(data_path)
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+
+    X, y = load_data(args.input)
     print(f"Loaded {len(X)} samples")
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
@@ -47,9 +52,8 @@ def main() -> None:
     print(f"Train: {train_metrics}")
     print(f"Test:  {test_metrics}")
 
-    model_path = model_dir / "model.joblib"
-    joblib.dump(model, model_path)
-    print(f"Saved to {model_path}")
+    joblib.dump(model, args.output)
+    print(f"Saved to {args.output}")
 
 
 if __name__ == "__main__":

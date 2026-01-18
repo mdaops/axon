@@ -5,7 +5,7 @@ WORKDIR /app
 RUN pip install uv
 
 COPY pyproject.toml .
-COPY discount_decisioning/ ./discount_decisioning/
+COPY src/ ./src/
 
 RUN uv pip install --system -e .
 
